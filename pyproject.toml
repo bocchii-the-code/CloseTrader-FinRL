@@ -1,0 +1,97 @@
+[project]
+name = "finrl"
+version = "0.3.8"
+description = "FinRL: Financial Reinforcement Learning Framework. Version 0.3.5 notes: stable version, code refactoring, more tutorials, clear documentation"
+readme = "README.md"
+requires-python = ">=3.9,<3.12"
+license = { text = "MIT" }
+authors = [
+    { name = "Hongyang Yang" },
+    { name = "Xiaoyang Liu" },
+]
+keywords = ["Reinforcement Learning", "Finance"]
+classifiers = [
+    # Trove classifiers
+    # Full list: https://pypi.python.org/pypi?%3Aaction=list_classifiers
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: Implementation :: CPython",
+    "Programming Language :: Python :: Implementation :: PyPy",
+]
+
+# uv reads dependencies from PEP 621 + PEP 735.
+# Keep these aligned with the currently-used `requirements.txt`/Docker setup.
+dependencies = [
+    "alpaca-py",
+    "alpaca-trade-api>=2.1.0",
+    "ccxt>=1.66.32",
+    "gputil",
+    # Some FinRL envs/tests still import `gym` (not `gymnasium`).
+    "gym",
+    "gymnasium",
+    "importlib-metadata>=6.0,<=8.5.0",
+    "jqdatasdk",
+    "lz4",
+    "matplotlib",
+    "numpy>=1.17.3",
+    "pandas>=1.1.5",
+    "pandas-market-calendars",
+    "pyfolio-reloaded",
+    "pyportfolioopt",
+    "ray[default,tune]",
+    "scikit-learn>=0.21.0",
+    "scipy",
+    "selenium",
+    "sqlalchemy",
+    "stable-baselines3[extra]",
+    "stockstats>=0.4.0",
+    # May require non-pip install on some platforms (see `requirements.txt`).
+    "TA-Lib",
+    "tensorboard",
+    "webdriver-manager",
+    "wrds",
+    "yfinance",
+]
+
+[project.urls]
+github = "https://github.com/AI4Finance-Foundation/FinRL"
+
+[project.optional-dependencies]
+# Install via: `uv sync --extra box2d` or `pip install -e \".[box2d]\"`.
+# This is only needed for Box2D-based gym environments.
+box2d = ["box2d-py"]
+
+# Optional DRL library adapters.
+elegantrl = ["elegantrl"]
+
+[dependency-groups]
+dev = [
+    "black",
+    "flake8",
+    "isort",
+    "jupyter",
+    "mypy",
+    "pandas-stubs",
+    "pre-commit",
+]
+test = ["pytest"]
+docs = ["recommonmark", "sphinx", "sphinx-rtd-theme"]
+
+[tool.uv]
+default-groups = ["dev", "test"]
+
+[build-system]
+requires = ["setuptools>=61", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["finrl*"]
