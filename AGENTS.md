@@ -1,4 +1,4 @@
-# AGENTS.md (FinRL)
+# AGENTS.md (CloseTrader-FinRL)
 
 # Karpathy Guidelines
 
@@ -63,11 +63,15 @@ For multi-step tasks, state a brief plan:
 Strong success criteria let you loop independently. Weak criteria ("make it work") require constant clarification.
 
 ## Fast orientation (what runs what)
-- Library entrypoint: `python -m finrl --mode=train|test|trade` (implemented in `finrl/main.py`).
+- Library entrypoint: `uv run python -m finrl --mode=train|test|trade` (implemented in `finrl/main.py`).
 - Code layout:
   - `finrl/meta/`: environments + preprocessors + data processors (data download/feature engineering lives here).
   - `finrl/agents/`: DRL library adapters (ElegantRL / RLlib / Stable-Baselines3).
   - `finrl/applications/` + `examples/`: runnable scripts/notebooks (most “end-to-end” demos are here).
+
+## Documentation structure
+- README.md — CloseTrader-FinRL project README (streamlined: quick start, tutorial, key features).
+- README_FINRL.md — Original upstream FinRL README (full ecosystem, data sources, publications, news).
 
 ## Install (don’t guess which tool)
 - Repo is now uv-friendly (PEP 621/735 in `pyproject.toml`), but `setup.py`/`requirements.txt` still exist for legacy installs.
@@ -83,17 +87,17 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 - Box2D environments are optional: `uv sync --extra box2d`
 
 ## Run the canonical example pipeline
-- `python examples/FinRL_StockTrading_2026_1_data.py`
-- `python examples/FinRL_StockTrading_2026_2_train.py`
-- `python examples/FinRL_StockTrading_2026_3_Backtest.py`
+- `uv run python examples/FinRL_StockTrading_2026_1_data.py`
+- `uv run python examples/FinRL_StockTrading_2026_2_train.py`
+- `uv run python examples/FinRL_StockTrading_2026_3_Backtest.py`
 
 ## Tests (non-obvious gotchas)
 - Tests live in `unit_tests/` (not `tests/`).
-- Minimal local run: `pytest unit_tests -v`.
+- Minimal local run: `uv run pytest unit_tests -v`.
 - Some tests hit external services:
   - Yahoo downloader tests require internet access (and may fail in restricted regions).
   - `unit_tests/downloaders/test_alpaca_downloader.py` uses placeholder creds (`API_KEY = "???"`) and will fail unless you wire in real Alpaca credentials.
-    - To run everything else: `pytest unit_tests -k "not alpaca_downloader" -v`.
+    - To run everything else: `uv run pytest unit_tests -k "not alpaca_downloader" -v`.
 
 ## CI parity (how CI actually runs tests)
 - GitHub Actions builds a Docker image and runs: `python3 -m pytest . -v` inside it.
