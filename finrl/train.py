@@ -12,7 +12,6 @@ from finrl.meta.env_stock_trading.env_stocktrading_np import StockTradingEnv
 
 # construct environment
 
-
 def train(
     start_date,
     end_date,

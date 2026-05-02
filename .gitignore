@@ -1,3 +1,8 @@
+# Codemap files (cartography)
+codemap.md
+**/codemap.md
+.slim/
+
 # Custom config
 #results/
 
@@ -146,3 +151,4 @@ papertrading_test.py
 alpaca_processor_test.py
 /finrl/config_private.py
 .history/
+*.png

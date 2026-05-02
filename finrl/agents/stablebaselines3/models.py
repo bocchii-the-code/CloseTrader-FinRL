@@ -56,6 +56,10 @@ class TensorboardCallback(BaseCallback):
         return True
 
     def _on_rollout_end(self) -> bool:
+        # Only on-policy algorithms (A2C, PPO) have rollout_buffer.
+        # Off-policy algorithms (DDPG, TD3, SAC) use replay_buffer instead.
+        if "rollout_buffer" not in self.locals:
+            return True
         try:
             rollout_buffer_rewards = self.locals["rollout_buffer"].rewards.flatten()
             self.logger.record(
@@ -68,7 +72,6 @@ class TensorboardCallback(BaseCallback):
                 key="train/reward_max", value=max(rollout_buffer_rewards)
             )
         except BaseException as error:
-            # Handle the case where "rewards" is not found
             self.logger.record(key="train/reward_min", value=None)
             self.logger.record(key="train/reward_mean", value=None)
             self.logger.record(key="train/reward_max", value=None)
@@ -114,7 +117,17 @@ class DRLAgent:
             )  # this is more informative than NotImplementedError("NotImplementedError")
 
         if model_kwargs is None:
-            model_kwargs = MODEL_KWARGS[model_name]
+            model_kwargs = MODEL_KWARGS[model_name].copy()
+        else:
+            model_kwargs = model_kwargs.copy()
+
+        # Prevent duplicate policy_kwargs: if present in model_kwargs, merge with explicitly passed
+        model_pk = model_kwargs.pop("policy_kwargs", None)
+        if model_pk is not None:
+            if policy_kwargs is not None:
+                policy_kwargs = {**model_pk, **policy_kwargs}
+            else:
+                policy_kwargs = model_pk
 
         if "action_noise" in model_kwargs:
             n_actions = self.env.action_space.shape[-1]

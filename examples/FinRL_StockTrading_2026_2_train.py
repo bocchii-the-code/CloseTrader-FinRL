@@ -1,3 +1,4 @@
+#%%
 """
 Stock NeurIPS2018 Part 2. Train
 
@@ -8,6 +9,8 @@ Introduce how to use FinRL to make data into the gym form environment, and train
 """
 
 from __future__ import annotations
+
+import os
 
 import pandas as pd
 from stable_baselines3.common.logger import configure
@@ -25,7 +28,9 @@ check_and_make_directories([TRAINED_MODEL_DIR])
 
 # %% Part 2. Build environment
 
-train = pd.read_csv("train_data.csv")
+# Use absolute path instead to read train data
+parent_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+train = pd.read_csv(os.path.join(parent_path, "train_data.csv"))
 train = train.set_index(train.columns[0])
 train.index.names = [""]
 
@@ -55,11 +60,11 @@ print(type(env_train))
 
 # %% Part 3. Train DRL Agents
 
-if_using_a2c = True
-if_using_ddpg = True
+if_using_a2c = False
+if_using_ddpg = False
 if_using_ppo = True
-if_using_td3 = True
-if_using_sac = True
+if_using_td3 = False
+if_using_sac = False
 
 # --- Agent 1: A2C ---
 agent = DRLAgent(env=env_train)
@@ -95,12 +100,47 @@ if if_using_ddpg:
 
 # --- Agent 3: PPO ---
 agent = DRLAgent(env=env_train)
+# PPO_PARAMS = {
+#     "n_steps": 2048,
+#     "ent_coef": 0.01,
+#     "learning_rate": 0.00025,
+#     "batch_size": 128,
+# }
+
 PPO_PARAMS = {
+    # Core
     "n_steps": 2048,
-    "ent_coef": 0.01,
+    "batch_size": 256,
+    "n_epochs": 10,
+
+    # Learning
     "learning_rate": 0.00025,
-    "batch_size": 128,
+    "gamma": 0.99,
+    "gae_lambda": 0.95,
+
+    # PPO clipping
+    "clip_range": 0.2,
+    "clip_range_vf": None,
+
+    # Loss weights
+    "ent_coef": 0.01, # Exploration rate
+    "vf_coef": 0.5,
+
+    # Optimization
+    "max_grad_norm": 0.5,
+    "normalize_advantage": True,
+    "target_kl": None,
+
+    # Exploration
+    "use_sde": False,
+
+    # Network
+    "policy_kwargs": {
+        "net_arch": [64, 64], # network size
+        "ortho_init": True, # orthogonal initialization
+    }
 }
+
 model_ppo = agent.get_model("ppo", model_kwargs=PPO_PARAMS)
 if if_using_ppo:
     tmp_path = RESULTS_DIR + "/ppo"

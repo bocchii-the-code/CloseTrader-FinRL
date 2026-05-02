@@ -9,6 +9,7 @@ Introduce how to use FinRL to fetch and process data that we need for ML/RL trad
 from __future__ import annotations
 
 import itertools
+import os
 
 import pandas as pd
 import yfinance as yf
@@ -22,6 +23,10 @@ from finrl.config import TRAIN_START_DATE
 from finrl.meta.preprocessor.preprocessors import data_split
 from finrl.meta.preprocessor.preprocessors import FeatureEngineer
 from finrl.meta.preprocessor.yahoodownloader import YahooDownloader
+
+# Surpress warnings from yfinance (not necessary, but makes the output cleaner)
+import warnings
+warnings.filterwarnings("ignore", category=pd.errors.Pandas4Warning)
 
 # %% Part 1. Fetch data - Single ticker
 
@@ -82,11 +87,13 @@ print(processed_full.head())
 
 # %% Part 4. Split and save data
 
+parent_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
 train = data_split(processed_full, TRAIN_START_DATE, TRAIN_END_DATE)
 trade = data_split(processed_full, TRADE_START_DATE, TRADE_END_DATE)
 print(f"\nTrain data length: {len(train)}")
 print(f"Trade data length: {len(trade)}")
 
-train.to_csv("train_data.csv")
-trade.to_csv("trade_data.csv")
+train.to_csv(os.path.join(parent_path, "train_data.csv"))
+trade.to_csv(os.path.join(parent_path, "trade_data.csv"))
 print("Data saved to train_data.csv and trade_data.csv")

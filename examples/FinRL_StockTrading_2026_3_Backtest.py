@@ -10,6 +10,8 @@ Mean Variance Optimization and DJIA index.
 
 from __future__ import annotations
 
+import os
+
 import matplotlib
 
 matplotlib.use("Agg")
@@ -25,8 +27,10 @@ from finrl.meta.preprocessor.yahoodownloader import YahooDownloader
 
 # %% Part 1. Load data
 
-train = pd.read_csv("train_data.csv")
-trade = pd.read_csv("trade_data.csv")
+parent_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+train = pd.read_csv(os.path.join(parent_path, "train_data.csv"))
+trade = pd.read_csv(os.path.join(parent_path, "trade_data.csv"))
 
 train = train.set_index(train.columns[0])
 train.index.names = [""]
