@@ -117,7 +117,17 @@ class DRLAgent:
             )  # this is more informative than NotImplementedError("NotImplementedError")
 
         if model_kwargs is None:
-            model_kwargs = MODEL_KWARGS[model_name]
+            model_kwargs = MODEL_KWARGS[model_name].copy()
+        else:
+            model_kwargs = model_kwargs.copy()
+
+        # Prevent duplicate policy_kwargs: if present in model_kwargs, merge with explicitly passed
+        model_pk = model_kwargs.pop("policy_kwargs", None)
+        if model_pk is not None:
+            if policy_kwargs is not None:
+                policy_kwargs = {**model_pk, **policy_kwargs}
+            else:
+                policy_kwargs = model_pk
 
         if "action_noise" in model_kwargs:
             n_actions = self.env.action_space.shape[-1]
