@@ -23,6 +23,10 @@ from finrl.meta.preprocessor.preprocessors import data_split
 from finrl.meta.preprocessor.preprocessors import FeatureEngineer
 from finrl.meta.preprocessor.yahoodownloader import YahooDownloader
 
+# Surpress warnings from yfinance (not necessary, but makes the output cleaner)
+import warnings
+warnings.filterwarnings("ignore", category=pd.errors.Pandas4Warning)
+
 # %% Part 1. Fetch data - Single ticker
 
 # Using yfinance directly

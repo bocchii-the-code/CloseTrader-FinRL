@@ -56,6 +56,10 @@ class TensorboardCallback(BaseCallback):
         return True
 
     def _on_rollout_end(self) -> bool:
+        # Only on-policy algorithms (A2C, PPO) have rollout_buffer.
+        # Off-policy algorithms (DDPG, TD3, SAC) use replay_buffer instead.
+        if "rollout_buffer" not in self.locals:
+            return True
         try:
             rollout_buffer_rewards = self.locals["rollout_buffer"].rewards.flatten()
             self.logger.record(
@@ -68,7 +72,6 @@ class TensorboardCallback(BaseCallback):
                 key="train/reward_max", value=max(rollout_buffer_rewards)
             )
         except BaseException as error:
-            # Handle the case where "rewards" is not found
             self.logger.record(key="train/reward_min", value=None)
             self.logger.record(key="train/reward_mean", value=None)
             self.logger.record(key="train/reward_max", value=None)
