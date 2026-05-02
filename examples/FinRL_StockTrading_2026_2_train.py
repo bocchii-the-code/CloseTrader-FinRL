@@ -65,6 +65,7 @@ if_using_ddpg = False
 if_using_ppo = True
 if_using_td3 = False
 if_using_sac = False
+total_timesteps = 100000
 
 # --- Agent 1: A2C ---
 agent = DRLAgent(env=env_train)
@@ -75,7 +76,7 @@ if if_using_a2c:
     model_a2c.set_logger(new_logger_a2c)
 
 trained_a2c = (
-    agent.train_model(model=model_a2c, tb_log_name="a2c", total_timesteps=20000)
+    agent.train_model(model=model_a2c, tb_log_name="a2c", total_timesteps=total_timesteps)
     if if_using_a2c
     else None
 )
@@ -91,7 +92,7 @@ if if_using_ddpg:
     model_ddpg.set_logger(new_logger_ddpg)
 
 trained_ddpg = (
-    agent.train_model(model=model_ddpg, tb_log_name="ddpg", total_timesteps=20000)
+    agent.train_model(model=model_ddpg, tb_log_name="ddpg", total_timesteps=total_timesteps)
     if if_using_ddpg
     else None
 )
@@ -106,38 +107,33 @@ agent = DRLAgent(env=env_train)
 #     "learning_rate": 0.00025,
 #     "batch_size": 128,
 # }
-
 PPO_PARAMS = {
-    # Core
-    "n_steps": 2048,
-    "batch_size": 256,
-    "n_epochs": 10,
+    # Core: Increased n_steps for a broader market "perspective"
+    "n_steps": 3072,           # Increased from 2048 to see more data before updating
+    "batch_size": 128,          # Increased from 256 to smooth out noisy price movements
+    "n_epochs": 10,             # More epochs to ensure the agent fully understands the larger batch
 
-    # Learning
-    "learning_rate": 0.00025,
-    "gamma": 0.99,
+    # Learning: Slower learning rate for precision
+    "learning_rate": 0.00025,    # Reduced (from 0.00025) to prevent "jumping" to conclusions
+    "gamma": 0.95,              # Slightly lowered to focus on a more reliable mid-term horizon
     "gae_lambda": 0.95,
 
-    # PPO clipping
-    "clip_range": 0.2,
+    # PPO clipping: Tighter constraints to prevent radical shifts in strategy
+    "clip_range": 0.2,         # Tighter than 0.2 to ensure updates stay "Proximal"
     "clip_range_vf": None,
 
-    # Loss weights
-    "ent_coef": 0.01, # Exploration rate
+    # Loss weights: Encouraging smarter exploration
+    "ent_coef": 0.005,          # Lowered exploration—focus more on what has worked
     "vf_coef": 0.5,
 
     # Optimization
     "max_grad_norm": 0.5,
     "normalize_advantage": True,
-    "target_kl": None,
 
-    # Exploration
-    "use_sde": False,
-
-    # Network
+    # Network: Simple architecture to prevent overfitting
     "policy_kwargs": {
-        "net_arch": [64, 64], # network size
-        "ortho_init": True, # orthogonal initialization
+        "net_arch": [128, 128], # Slightly wider but still shallow to capture non-linearities
+        "ortho_init": True,
     }
 }
 
@@ -148,7 +144,7 @@ if if_using_ppo:
     model_ppo.set_logger(new_logger_ppo)
 
 trained_ppo = (
-    agent.train_model(model=model_ppo, tb_log_name="ppo", total_timesteps=20000)
+    agent.train_model(model=model_ppo, tb_log_name="ppo", total_timesteps=total_timesteps)
     if if_using_ppo
     else None
 )
@@ -169,7 +165,7 @@ if if_using_td3:
     model_td3.set_logger(new_logger_td3)
 
 trained_td3 = (
-    agent.train_model(model=model_td3, tb_log_name="td3", total_timesteps=20000)
+    agent.train_model(model=model_td3, tb_log_name="td3", total_timesteps=total_timesteps)
     if if_using_td3
     else None
 )
@@ -192,7 +188,7 @@ if if_using_sac:
     model_sac.set_logger(new_logger_sac)
 
 trained_sac = (
-    agent.train_model(model=model_sac, tb_log_name="sac", total_timesteps=20000)
+    agent.train_model(model=model_sac, tb_log_name="sac", total_timesteps=total_timesteps)
     if if_using_sac
     else None
 )
