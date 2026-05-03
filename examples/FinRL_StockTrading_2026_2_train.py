@@ -65,7 +65,7 @@ if_using_ddpg = False
 if_using_ppo = True
 if_using_td3 = False
 if_using_sac = False
-total_timesteps = 20000
+total_timesteps = 300000
 
 # --- Agent 1: A2C ---
 agent = DRLAgent(env=env_train)

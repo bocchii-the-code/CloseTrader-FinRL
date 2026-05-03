@@ -1,4 +1,3 @@
-#%%
 """
 Stock NeurIPS2018 Part 3. Backtest
 
@@ -40,18 +39,15 @@ trade.index.names = [""]
 
 # %% Part 2. Load trained agents
 
-if_using_a2c = False
-if_using_ddpg = False
+if_using_a2c = True
+if_using_ddpg = True
 if_using_ppo = True
-if_using_td3 = False
-if_using_sac = False
-
-
-trained_ppo = PPO.load("../"+ TRAINED_MODEL_DIR + "/agent_ppo") if if_using_ppo else None
-
+if_using_td3 = True
+if_using_sac = True
 
 trained_a2c = A2C.load(TRAINED_MODEL_DIR + "/agent_a2c") if if_using_a2c else None
 trained_ddpg = DDPG.load(TRAINED_MODEL_DIR + "/agent_ddpg") if if_using_ddpg else None
+trained_ppo = PPO.load(TRAINED_MODEL_DIR + "/agent_ppo") if if_using_ppo else None
 trained_td3 = TD3.load(TRAINED_MODEL_DIR + "/agent_td3") if if_using_td3 else None
 trained_sac = SAC.load(TRAINED_MODEL_DIR + "/agent_sac") if if_using_sac else None
 
@@ -226,5 +222,3 @@ plt.xlabel("Date")
 plt.ylabel("Portfolio Value ($)")
 plt.savefig("backtest_result.png", dpi=150, bbox_inches="tight")
 print("\nPlot saved to backtest_result.png")
-
-# %%
