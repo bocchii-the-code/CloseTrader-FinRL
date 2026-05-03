@@ -53,7 +53,7 @@ This tutorial demonstrates the original FinRL workflow for educational and resea
 
 ```bash
 # Clone and enter repository
-git clone https://github.com/AI4Finance-Foundation/FinRL.git
+git clone https://github.com/bocchii-the-code/CloseTrader-FinRL.git
 cd FinRL
 
 # Pin Python 3.11 and create virtual environment
@@ -74,6 +74,7 @@ This script downloads DOW 30 stock data from Yahoo Finance, adds technical indic
 **2. Train DRL Agents**
 
 ```bash
+# You may need to tweak the original hyperparameter and model selected to accelerate the training exmaple
 uv run python examples/FinRL_StockTrading_2026_2_train.py
 ```
 
