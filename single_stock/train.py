@@ -23,175 +23,168 @@ from finrl.main import check_and_make_directories
 from finrl.meta.env_stock_trading.env_stocktrading import StockTradingEnv
 
 # %% Part 1. Prepare directories
+def make_trained_model_dir(save_path = TRAINED_MODEL_DIR) -> str:
 
-check_and_make_directories([TRAINED_MODEL_DIR])
+    check_and_make_directories([TRAINED_MODEL_DIR])
+    
+    return save_path
 
 # %% Part 2. Build environment
+def build_environment(train_data_path: str = None) -> StockTradingEnv:
+# Use absolute path to read train data
+    '''
+    Build the StockTradingEnv environment using the training data.
+    Args:
+        train_data_path (str): The path to the training data CSV file. If None, defaults to "train_data.csv" in the parent directory.
+    Returns:
+        StockTradingEnv: The initialized StockTradingEnv environment.
+    '''
+    parent_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__))) if train_data_path is None else os.path.dirname(os.path.abspath(train_data_path))
+    train = pd.read_csv(os.path.join(parent_path, "train_data.csv"))
+    train = train.set_index(train.columns[0])
+    train.index.names = [""]
 
-# Use absolute path instead to read train data
-parent_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-train = pd.read_csv(os.path.join(parent_path, "train_data.csv"))
-train = train.set_index(train.columns[0])
-train.index.names = [""]
+    stock_dimension = len(train.tic.unique())
+    state_space = 1 + 2 * stock_dimension + len(INDICATORS) * stock_dimension
+    print(f"Stock Dimension: {stock_dimension}, State Space: {state_space}")
 
-stock_dimension = len(train.tic.unique())
-state_space = 1 + 2 * stock_dimension + len(INDICATORS) * stock_dimension
-print(f"Stock Dimension: {stock_dimension}, State Space: {state_space}")
+    buy_cost_list = sell_cost_list = [0.001] * stock_dimension
+    num_stock_shares = [0] * stock_dimension
 
-buy_cost_list = sell_cost_list = [0.001] * stock_dimension
-num_stock_shares = [0] * stock_dimension
+    env_kwargs = {
+        "hmax": 100,
+        "initial_amount": 1000000,
+        "num_stock_shares": num_stock_shares,
+        "buy_cost_pct": buy_cost_list,
+        "sell_cost_pct": sell_cost_list,
+        "state_space": state_space,
+        "stock_dim": stock_dimension,
+        "tech_indicator_list": INDICATORS,
+        "action_space": stock_dimension,
+        "reward_scaling": 1e-4,
+    }
 
-env_kwargs = {
-    "hmax": 100,
-    "initial_amount": 1000000,
-    "num_stock_shares": num_stock_shares,
-    "buy_cost_pct": buy_cost_list,
-    "sell_cost_pct": sell_cost_list,
-    "state_space": state_space,
-    "stock_dim": stock_dimension,
-    "tech_indicator_list": INDICATORS,
-    "action_space": stock_dimension,
-    "reward_scaling": 1e-4,
-}
-
-e_train_gym = StockTradingEnv(df=train, **env_kwargs)
-env_train, _ = e_train_gym.get_sb_env()
-print(type(env_train))
+    e_train_gym = StockTradingEnv(df=train, **env_kwargs)
+    env_train, _ = e_train_gym.get_sb_env()
+    print(type(env_train))
+    return env_train
 
 # %% Part 3. Train DRL Agents
+def train_drl_agents(
+        env_train: StockTradingEnv, 
+        total_timesteps: int = 30000, 
+        save_path: str = TRAINED_MODEL_DIR, 
+        models: list[str] = ["a2c", "ddpg", "ppo", "td3", "sac"]
+        ) -> dict[str, DRLAgent]:
+    '''
+    Train DRL agents (A2C, DDPG, PPO, TD3, SAC) on the given environment and save the trained models.
+    Args:
+        env_train (StockTradingEnv): The environment to train the agents on.
+        total_timesteps (int): The total number of timesteps to train each agent. Default is 300,000.
+        save_path (str): The directory path where the trained models will be saved. If None, defaults to TRAINED_MODEL_DIR.
+        models (list[str]): The models to train. If None, all agents will be trained. Options are ["a2c", "ddpg", "ppo", "td3", "sac"].
+    Returns:
+        dict[str, DRLAgent]: A dictionary containing the trained agents with keys as agent names
+    '''
 
-if_using_a2c = False
-if_using_ddpg = False
-if_using_ppo = True
-if_using_td3 = False
-if_using_sac = False
-total_timesteps = 300000
+    if_using_a2c = False
+    if_using_ddpg = False
+    if_using_ppo = False
+    if_using_td3 = False
+    if_using_sac = False
 
-# --- Agent 1: A2C ---
-agent = DRLAgent(env=env_train)
-model_a2c = agent.get_model("a2c")
-if if_using_a2c:
-    tmp_path = RESULTS_DIR + "/a2c"
-    new_logger_a2c = configure(tmp_path, ["stdout", "csv", "tensorboard"])
-    model_a2c.set_logger(new_logger_a2c)
+    # Set models used for training based on user input
+    for model in models:
+        if model not in ["a2c", "ddpg", "ppo", "td3", "sac"]:
+            raise ValueError(f"Invalid model name: {model}. Valid options are ['a2c', 'ddpg', 'ppo', 'td3', 'sac']")
+        
+        match model:
+            case "a2c":
+                if_using_a2c = True
+            case "ddpg":
+                if_using_ddpg = True
+            case "ppo":
+                if_using_ppo = True
+            case "td3":
+                if_using_td3 = True
+            case "sac":
+                if_using_sac = True
 
-trained_a2c = (
-    agent.train_model(model=model_a2c, tb_log_name="a2c", total_timesteps=total_timesteps)
-    if if_using_a2c
-    else None
-)
-if if_using_a2c:
-    trained_a2c.save(TRAINED_MODEL_DIR + "/agent_a2c")
-
-# --- Agent 2: DDPG ---
-agent = DRLAgent(env=env_train)
-model_ddpg = agent.get_model("ddpg")
-if if_using_ddpg:
-    tmp_path = RESULTS_DIR + "/ddpg"
-    new_logger_ddpg = configure(tmp_path, ["stdout", "csv", "tensorboard"])
-    model_ddpg.set_logger(new_logger_ddpg)
-
-trained_ddpg = (
-    agent.train_model(model=model_ddpg, tb_log_name="ddpg", total_timesteps=total_timesteps)
-    if if_using_ddpg
-    else None
-)
-if if_using_ddpg:
-    trained_ddpg.save(TRAINED_MODEL_DIR + "/agent_ddpg")
-
-# --- Agent 3: PPO ---
-agent = DRLAgent(env=env_train)
-# PPO_PARAMS = {
-#     "n_steps": 2048,
-#     "ent_coef": 0.01,
-#     "learning_rate": 0.00025,
-#     "batch_size": 128,
-# }
-PPO_PARAMS = {
-    # Core: Increased n_steps for a broader market "perspective"
-    "n_steps": 3014,           # Increased from 2048 to see more data before updating
-    "batch_size": 256,          # Increased from 256 to smooth out noisy price movements
-    "n_epochs": 10,             # More epochs to ensure the agent fully understands the larger batch
-
-    # Learning: Slower learning rate for precision
-    "learning_rate": 0.0003,    # Reduced (from 0.00025) to prevent "jumping" to conclusions
-    "gamma": 0.995,              # Slightly lowered to focus on a more reliable mid-term horizon
-    "gae_lambda": 0.99,
-
-    # PPO clipping: Tighter constraints to prevent radical shifts in strategy
-    "clip_range": 0.2,         # Tighter than 0.2 to ensure updates stay "Proximal"
-
-    # Loss weights: Encouraging smarter exploration
-    "ent_coef": 0.02,  
-    "vf_coef": 0.5,
-
-    # Optimization
-    "max_grad_norm": 0.5,
-    "normalize_advantage": True,
-
-    # Network: Simple architecture to prevent overfitting
-    "policy_kwargs": {
-        "net_arch": [256, 128], # Slightly wider but still shallow to capture non-linearities
-        "ortho_init": True,
+    # Hyperparameter overrides per algorithm (defaults from config.py used otherwise)
+    model_params = {
+        "ppo": {
+            "n_steps": 3014,
+            "batch_size": 256,
+            "n_epochs": 10,
+            "learning_rate": 3e-4,
+            "gamma": 0.995,
+            "gae_lambda": 0.99,
+            "clip_range": 0.2,
+            "ent_coef": 0.02,
+            "vf_coef": 0.5,
+            "max_grad_norm": 0.5,
+            "normalize_advantage": True,
+            "policy_kwargs": {"net_arch": [256, 128], "ortho_init": True},
+        },
+        "ddpg": {
+            "batch_size": 128,
+            "buffer_size": 50000,
+            "learning_rate": 1e-3,
+        },
+        "td3": {
+            "batch_size": 100,
+            "buffer_size": 1000000,
+            "learning_rate": 1e-3,
+        },
+        "sac": {
+            "batch_size": 128,
+            "buffer_size": 100000,
+            "learning_rate": 1e-4,
+            "learning_starts": 100,
+            "ent_coef": "auto_0.1",
+        },
     }
-}
 
-model_ppo = agent.get_model("ppo", model_kwargs=PPO_PARAMS)
-if if_using_ppo:
-    tmp_path = RESULTS_DIR + "/ppo"
-    new_logger_ppo = configure(tmp_path, ["stdout", "csv", "tensorboard"])
-    model_ppo.set_logger(new_logger_ppo)
 
-trained_ppo = (
-    agent.train_model(model=model_ppo, tb_log_name="ppo", total_timesteps=total_timesteps)
-    if if_using_ppo
-    else None
-)
-if if_using_ppo:
-    trained_ppo.save(TRAINED_MODEL_DIR + "/agent_ppo")
+    # Start training loop for each enabled agent
+    enabled = {"a2c": if_using_a2c, 
+               "ddpg": if_using_ddpg, 
+               "ppo": if_using_ppo,
+               "td3": if_using_td3, 
+               "sac": if_using_sac}
 
-# --- Agent 4: TD3 ---
-agent = DRLAgent(env=env_train)
-TD3_PARAMS = {
-    "batch_size": 100,
-    "buffer_size": 1000000,
-    "learning_rate": 0.001,
-}
-model_td3 = agent.get_model("td3", model_kwargs=TD3_PARAMS)
-if if_using_td3:
-    tmp_path = RESULTS_DIR + "/td3"
-    new_logger_td3 = configure(tmp_path, ["stdout", "csv", "tensorboard"])
-    model_td3.set_logger(new_logger_td3)
+    trained = {}
+    for name in ["a2c", "ddpg", "ppo", "td3", "sac"]:
+        if not enabled[name]:
+            trained[name] = None
+            continue
 
-trained_td3 = (
-    agent.train_model(model=model_td3, tb_log_name="td3", total_timesteps=total_timesteps)
-    if if_using_td3
-    else None
-)
-if if_using_td3:
-    trained_td3.save(TRAINED_MODEL_DIR + "/agent_td3")
+        agent = DRLAgent(env=env_train)
+        kwargs = model_params.get(name, None)
+        model = agent.get_model(name, model_kwargs=kwargs)
 
-# --- Agent 5: SAC ---
-agent = DRLAgent(env=env_train)
-SAC_PARAMS = {
-    "batch_size": 128,
-    "buffer_size": 100000,
-    "learning_rate": 0.0001,
-    "learning_starts": 100,
-    "ent_coef": "auto_0.1",
-}
-model_sac = agent.get_model("sac", model_kwargs=SAC_PARAMS)
-if if_using_sac:
-    tmp_path = RESULTS_DIR + "/sac"
-    new_logger_sac = configure(tmp_path, ["stdout", "csv", "tensorboard"])
-    model_sac.set_logger(new_logger_sac)
+        tmp_path = f"{RESULTS_DIR}/{name}"
+        model.set_logger(configure(tmp_path, ["stdout", "csv", "tensorboard"]))
 
-trained_sac = (
-    agent.train_model(model=model_sac, tb_log_name="sac", total_timesteps=total_timesteps)
-    if if_using_sac
-    else None
-)
-if if_using_sac:
-    trained_sac.save(TRAINED_MODEL_DIR + "/agent_sac")
+        trained[name] = agent.train_model(
+            model=model, tb_log_name=name, total_timesteps=total_timesteps
+        )
+        trained[name].save(os.path.join(save_path, f"agent_{name}"))
+        print(f"  [✓] {name.upper()} trained and saved to {os.path.join(save_path, f'agent_{name}')}")
 
-print("All agents trained and saved to", TRAINED_MODEL_DIR)
+    return trained
+
+#%% Main function to run the training steps
+def main():
+    # Prepare directories
+    make_trained_model_dir()
+
+    # Build environment
+    env_train = build_environment()
+
+    # Train DRL agents
+    trained_agents = train_drl_agents(env_train, total_timesteps=30000, save_path=TRAINED_MODEL_DIR, models=["ppo"])
+
+
+if __name__ == "__main__":
+    main()
