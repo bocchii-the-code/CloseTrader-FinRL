@@ -1,3 +1,4 @@
+#%%
 """
 Stock NeurIPS2018 Part 1. Data
 
@@ -13,6 +14,8 @@ import os
 
 import pandas as pd
 import yfinance as yf
+import warnings # Surpress warnings from yfinance
+warnings.filterwarnings("ignore", category=pd.errors.Pandas4Warning)
 
 from finrl import config_tickers
 from finrl.config import INDICATORS
@@ -24,76 +27,144 @@ from finrl.meta.preprocessor.preprocessors import data_split
 from finrl.meta.preprocessor.preprocessors import FeatureEngineer
 from finrl.meta.preprocessor.yahoodownloader import YahooDownloader
 
-# Surpress warnings from yfinance (not necessary, but makes the output cleaner)
-import warnings
-warnings.filterwarnings("ignore", category=pd.errors.Pandas4Warning)
+
 
 # %% Part 1. Fetch data - Single ticker
+def fetch_single_stock_data(ticker: str, start_date: str = None, end_date: str = None) -> pd.DataFrame:
+    """
+    Fetch historical stock data for a single ticker using yfinance.
 
-# Using yfinance directly
-aapl_df_yf = yf.download(tickers="aapl", start="2020-01-01", end="2020-01-31")
-print("=== yfinance download ===")
-print(aapl_df_yf.head())
+    Args:
+        ticker (str): The stock ticker symbol (e.g., "AAPL").
+        start_date (str): The start date for fetching data (format: "YYYY-MM-DD"). If None, defaults to TRAIN_START_DATE.
+        end_date (str): The end date for fetching data (format: "YYYY-MM-DD"). If None, defaults to TRADE_END_DATE.
 
-# Using FinRL's YahooDownloader
-aapl_df_finrl = YahooDownloader(
-    start_date="2020-01-01",
-    end_date="2020-01-31",
-    ticker_list=["aapl"],
-).fetch_data()
-print("\n=== FinRL YahooDownloader ===")
-print(aapl_df_finrl.head())
+    Returns:
+        pd.DataFrame: A DataFrame containing the historical stock data.
+    """
+    # Using yfinance directly
+    df_yf = yf.download(tickers=ticker, start=start_date, end=end_date)
+    print("=== yfinance download ===")
+    print(df_yf.head())
+
+    # Using FinRL's YahooDownloader
+    df_finrl = YahooDownloader(
+        start_date=start_date if start_date else TRAIN_START_DATE,
+        end_date=end_date if end_date else TRADE_END_DATE,
+        ticker_list=[ticker],
+    ).fetch_data()
+    print("\n=== FinRL YahooDownloader ===")
+    print(df_finrl.head())
+    return df_finrl
 
 # %% Part 2. Fetch data - DOW 30 tickers
+def fetch_dow30_data(start_date: str = None, end_date: str = None) -> pd.DataFrame:
+    """
+    Fetch historical stock data for DOW 30 tickers using FinRL's YahooDownloader.
 
-print("\n=== DOW 30 Tickers ===")
-print(config_tickers.DOW_30_TICKER)
+    Args:
+        start_date (str): The start date for fetching data (format: "YYYY-MM-DD"). If None, defaults to TRAIN_START_DATE.
+        end_date (str): The end date for fetching data (format: "YYYY-MM-DD"). If None, defaults to TRADE_END_DATE.
 
-df_raw = YahooDownloader(
-    start_date=TRAIN_START_DATE,
-    end_date=TRADE_END_DATE,
-    ticker_list=config_tickers.DOW_30_TICKER,
-).fetch_data()
-print("\n=== Raw data ===")
-print(df_raw.head())
+    Returns:
+        pd.DataFrame: A DataFrame containing the historical stock data for DOW 30 tickers.
+    """
+    print("\n=== DOW 30 Tickers ===")
+    print(config_tickers.DOW_30_TICKER)
+
+    df_raw = YahooDownloader(
+        start_date=start_date if start_date else TRAIN_START_DATE,
+        end_date=end_date if end_date else TRADE_END_DATE,
+        ticker_list=config_tickers.DOW_30_TICKER,
+    ).fetch_data()
+    print("\n=== Raw data ===")
+    print(df_raw.head())
+    return df_raw
 
 # %% Part 3. Preprocess data
+def preprocess_data(df_raw: pd.DataFrame,
+                    use_technical_indicator: bool = True,
+                    tech_indicator_list: list = INDICATORS,
+                    use_vix: bool = True,
+                    use_turbulence: bool = True,
+                    user_defined_feature: bool = False) -> pd.DataFrame:
+    """
+    Preprocess the raw stock data using FinRL's FeatureEngineer.
 
-fe = FeatureEngineer(
-    use_technical_indicator=True,
-    tech_indicator_list=INDICATORS,
-    use_vix=True,
-    use_turbulence=True,
-    user_defined_feature=False,
-)
+    Args:
+        df_raw (pd.DataFrame): The raw stock data DataFrame.
+        use_technical_indicator (bool): Whether to use technical indicators.
+        tech_indicator_list (list): List of technical indicators to use.
+        use_vix (bool): Whether to use VIX data.
+        use_turbulence (bool): Whether to use turbulence data.
+        user_defined_feature (bool): Whether to use user-defined features.
 
-processed = fe.preprocess_data(df_raw)
+    Returns:
+        pd.DataFrame: A preprocessed DataFrame ready for training/testing.
+    """
+    fe = FeatureEngineer(
+        use_technical_indicator=use_technical_indicator,
+        tech_indicator_list=tech_indicator_list,
+        use_vix=use_vix,
+        use_turbulence=use_turbulence,
+        user_defined_feature=user_defined_feature,
+    )
 
-list_ticker = processed["tic"].unique().tolist()
-list_date = list(
-    pd.date_range(processed["date"].min(), processed["date"].max()).astype(str)
-)
-combination = list(itertools.product(list_date, list_ticker))
+    processed = fe.preprocess_data(df_raw)
 
-processed_full = pd.DataFrame(combination, columns=["date", "tic"]).merge(
-    processed, on=["date", "tic"], how="left"
-)
-processed_full = processed_full[processed_full["date"].isin(processed["date"])]
-processed_full = processed_full.sort_values(["date", "tic"])
-processed_full = processed_full.fillna(0)
+    list_ticker = processed["tic"].unique().tolist()
+    list_date = list(
+        pd.date_range(processed["date"].min(), processed["date"].max()).astype(str)
+    )
+    combination = list(itertools.product(list_date, list_ticker))
 
-print("\n=== Processed data ===")
-print(processed_full.head())
+    processed_full = pd.DataFrame(combination, columns=["date", "tic"]).merge(
+        processed, on=["date", "tic"], how="left"
+    )
+    processed_full = processed_full[processed_full["date"].isin(processed["date"])]
+    processed_full = processed_full.sort_values(["date", "tic"])
+    processed_full = processed_full.fillna(0)
 
-# %% Part 4. Split and save data
+    print("\n=== Processed data ===")
+    print(processed_full.head())
 
-parent_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    return processed_full
 
-train = data_split(processed_full, TRAIN_START_DATE, TRAIN_END_DATE)
-trade = data_split(processed_full, TRADE_START_DATE, TRADE_END_DATE)
-print(f"\nTrain data length: {len(train)}")
-print(f"Trade data length: {len(trade)}")
 
-train.to_csv(os.path.join(parent_path, "train_data.csv"))
-trade.to_csv(os.path.join(parent_path, "trade_data.csv"))
-print("Data saved to train_data.csv and trade_data.csv")
+    # %% Part 4. Split and save data
+def split_and_save_data(processed_full: pd.DataFrame, save_path: str=None) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Split the processed data into training and trading sets, and save them as CSV files. The training set will be used for training the DRL agents, while the trading set will be used for backtesting.
+    Args:
+        processed_full (pd.DataFrame): The fully processed DataFrame containing all the stock data.
+        save_path (str): The directory path where the CSV files will be saved. If None, defaults to the parent directory of the current file. 
+    Returns:
+        train, trade: A tuple containing the (training, trading) DataFrames.
+
+    """
+
+    parent_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__))) if save_path is None else save_path
+
+    train = data_split(processed_full, TRAIN_START_DATE, TRAIN_END_DATE)
+    trade = data_split(processed_full, TRADE_START_DATE, TRADE_END_DATE)
+    print(f"\nTrain data length: {len(train)}")
+    print(f"Trade data length: {len(trade)}")
+
+    train.to_csv(os.path.join(parent_path, "train_data.csv"))
+    trade.to_csv(os.path.join(parent_path, "trade_data.csv"))
+    print("Data saved to train_data.csv and trade_data.csv")
+    return train, trade
+
+    #%% Main funtion to run the preprocessing steps
+def main():
+    # Fetch data for DOW 30 tickers
+    df_raw = fetch_dow30_data()
+
+    # Preprocess the data
+    processed_full = preprocess_data(df_raw)
+
+    # Save the processed data
+    train_df, trade_df = split_and_save_data(processed_full)
+
+# %%
+if __name__ == "__main__":
+    main()
