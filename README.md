@@ -27,7 +27,7 @@ This project preserves the core FinRL workflow while providing modern tooling vi
 pip install uv
 
 # Clone the repository
-git clone https://github.com/AI4Finance-Foundation/FinRL.git
+git clone https://github.com/bocchii-the-code/CloseTrader-FinRL.git
 cd FinRL
 
 # Pin Python version and sync dependencies
