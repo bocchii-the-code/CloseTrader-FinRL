@@ -47,6 +47,7 @@ dependencies = [
     "scikit-learn>=0.21.0",
     "scipy",
     "selenium",
+    "setuptools>=65.5.0,<70",
     "sqlalchemy",
     "stable-baselines3[extra]",
     "stockstats>=0.4.0",
