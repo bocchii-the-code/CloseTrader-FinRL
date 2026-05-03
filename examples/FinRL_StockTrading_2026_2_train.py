@@ -65,7 +65,7 @@ if_using_ddpg = False
 if_using_ppo = True
 if_using_td3 = False
 if_using_sac = False
-total_timesteps = 100000
+total_timesteps = 300000
 
 # --- Agent 1: A2C ---
 agent = DRLAgent(env=env_train)
@@ -109,21 +109,20 @@ agent = DRLAgent(env=env_train)
 # }
 PPO_PARAMS = {
     # Core: Increased n_steps for a broader market "perspective"
-    "n_steps": 3072,           # Increased from 2048 to see more data before updating
-    "batch_size": 128,          # Increased from 256 to smooth out noisy price movements
+    "n_steps": 3014,           # Increased from 2048 to see more data before updating
+    "batch_size": 256,          # Increased from 256 to smooth out noisy price movements
     "n_epochs": 10,             # More epochs to ensure the agent fully understands the larger batch
 
     # Learning: Slower learning rate for precision
-    "learning_rate": 0.00025,    # Reduced (from 0.00025) to prevent "jumping" to conclusions
-    "gamma": 0.95,              # Slightly lowered to focus on a more reliable mid-term horizon
-    "gae_lambda": 0.95,
+    "learning_rate": 0.0003,    # Reduced (from 0.00025) to prevent "jumping" to conclusions
+    "gamma": 0.995,              # Slightly lowered to focus on a more reliable mid-term horizon
+    "gae_lambda": 0.99,
 
     # PPO clipping: Tighter constraints to prevent radical shifts in strategy
     "clip_range": 0.2,         # Tighter than 0.2 to ensure updates stay "Proximal"
-    "clip_range_vf": None,
 
     # Loss weights: Encouraging smarter exploration
-    "ent_coef": 0.005,          # Lowered exploration—focus more on what has worked
+    "ent_coef": 0.02,  
     "vf_coef": 0.5,
 
     # Optimization
@@ -132,7 +131,7 @@ PPO_PARAMS = {
 
     # Network: Simple architecture to prevent overfitting
     "policy_kwargs": {
-        "net_arch": [128, 128], # Slightly wider but still shallow to capture non-linearities
+        "net_arch": [256, 128], # Slightly wider but still shallow to capture non-linearities
         "ortho_init": True,
     }
 }
