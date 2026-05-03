@@ -11,8 +11,13 @@ Introduce how to use FinRL to make data into the gym form environment, and train
 from __future__ import annotations
 
 import os
-
 import pandas as pd
+
+# Suppress Pandas4Warning from yfinance/pandas: monkey-patch because
+# regular warnings.filterwarnings() does not catch C-level deprecations.
+_pd_utcnow = getattr(pd.Timestamp, "utcnow", None)
+if _pd_utcnow is not None:
+    pd.Timestamp.utcnow = lambda: pd.Timestamp.now("UTC")
 from stable_baselines3.common.logger import configure
 
 from finrl.agents.stablebaselines3.models import DRLAgent
@@ -113,7 +118,7 @@ def train_drl_agents(
     # Hyperparameter overrides per algorithm (defaults from config.py used otherwise)
     model_params = {
         "ppo": {
-            "n_steps": 3014,
+            "n_steps": 1024,
             "batch_size": 256,
             "n_epochs": 10,
             "learning_rate": 3e-4,
@@ -177,7 +182,8 @@ def train_drl_agents(
 #%% Main function to run the training steps
 def main():
     # Prepare directories
-    make_trained_model_dir()
+    save_dir = make_trained_model_dir()
+    print(f"Trained models will be saved to: {save_dir}")
 
     # Build environment
     env_train = build_environment()

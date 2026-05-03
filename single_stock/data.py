@@ -14,8 +14,12 @@ import os
 
 import pandas as pd
 import yfinance as yf
-import warnings # Surpress warnings from yfinance
-warnings.filterwarnings("ignore", category=pd.errors.Pandas4Warning)
+
+# Suppress Pandas4Warning from yfinance/pandas: monkey-patch because
+# regular warnings.filterwarnings() does not catch C-level deprecations.
+_pd_utcnow = getattr(pd.Timestamp, "utcnow", None)
+if _pd_utcnow is not None:
+    pd.Timestamp.utcnow = lambda: pd.Timestamp.now("UTC")
 
 from finrl import config_tickers
 from finrl.config import INDICATORS
