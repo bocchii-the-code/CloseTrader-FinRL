@@ -27,6 +27,25 @@ from finrl.config import TRAINED_MODEL_DIR
 from finrl.main import check_and_make_directories
 from finrl.meta.env_stock_trading.env_stocktrading import StockTradingEnv
 
+VALID_MODELS = {"a2c", "ddpg", "ppo", "td3", "sac"}
+VALID_MODELS_LIST = sorted(VALID_MODELS)
+
+BUILTIN_MODEL_PARAMS: dict[str, dict] = {
+    "ppo": {
+        "n_steps": 1024, "batch_size": 256, "n_epochs": 10,
+        "learning_rate": 3e-4, "gamma": 0.995, "gae_lambda": 0.99,
+        "clip_range": 0.2, "ent_coef": 0.02, "vf_coef": 0.5,
+        "max_grad_norm": 0.5, "normalize_advantage": True,
+        "policy_kwargs": {"net_arch": [256, 128], "ortho_init": True},
+    },
+    "ddpg": {"batch_size": 128, "buffer_size": 50_000, "learning_rate": 1e-3},
+    "td3": {"batch_size": 100, "buffer_size": 1_000_000, "learning_rate": 1e-3},
+    "sac": {
+        "batch_size": 128, "buffer_size": 100_000, "learning_rate": 1e-4,
+        "learning_starts": 100, "ent_coef": "auto_0.1",
+    },
+}
+
 # %% Part 1. Prepare directories
 def make_trained_model_dir(save_path = TRAINED_MODEL_DIR) -> str:
 
@@ -76,96 +95,46 @@ def build_environment(train_data_path: str = None) -> StockTradingEnv:
 
 # %% Part 3. Train DRL Agents
 def train_drl_agents(
-        env_train: StockTradingEnv, 
-        total_timesteps: int = 30000, 
-        save_path: str = TRAINED_MODEL_DIR, 
-        models: list[str] = ["a2c", "ddpg", "ppo", "td3", "sac"]
+        env_train: StockTradingEnv,
+        total_timesteps: int = 30000,
+        save_path: str = TRAINED_MODEL_DIR,
+        models: list[str] | None = None,
+        model_params: dict[str, dict] | None = None,
         ) -> dict[str, DRLAgent]:
-    '''
-    Train DRL agents (A2C, DDPG, PPO, TD3, SAC) on the given environment and save the trained models.
+    '''Train DRL agents and save trained models.
+
     Args:
-        env_train (StockTradingEnv): The environment to train the agents on.
-        total_timesteps (int): The total number of timesteps to train each agent. Default is 300,000.
-        save_path (str): The directory path where the trained models will be saved. If None, defaults to TRAINED_MODEL_DIR.
-        models (list[str]): The models to train. If None, all agents will be trained. Options are ["a2c", "ddpg", "ppo", "td3", "sac"].
+        env_train: The training environment.
+        total_timesteps: Training steps per agent.
+        save_path: Directory for saving model files.
+        models: Algorithms to train. Default all five: ["a2c", ..., "sac"].
+        model_params: Per-model hyperparameter overrides, merged with BUILTIN_MODEL_PARAMS.
     Returns:
-        dict[str, DRLAgent]: A dictionary containing the trained agents with keys as agent names
+        Dict mapping algorithm name -> trained model (or None if skipped).
     '''
+    if models is None:
+        models = VALID_MODELS_LIST
 
-    if_using_a2c = False
-    if_using_ddpg = False
-    if_using_ppo = False
-    if_using_td3 = False
-    if_using_sac = False
+    # Validate model names
+    invalid = set(models) - VALID_MODELS
+    if invalid:
+        raise ValueError(f"Invalid model name(s): {invalid}. Valid: {VALID_MODELS}")
 
-    # Set models used for training based on user input
-    for model in models:
-        if model not in ["a2c", "ddpg", "ppo", "td3", "sac"]:
-            raise ValueError(f"Invalid model name: {model}. Valid options are ['a2c', 'ddpg', 'ppo', 'td3', 'sac']")
-        
-        match model:
-            case "a2c":
-                if_using_a2c = True
-            case "ddpg":
-                if_using_ddpg = True
-            case "ppo":
-                if_using_ppo = True
-            case "td3":
-                if_using_td3 = True
-            case "sac":
-                if_using_sac = True
-
-    # Hyperparameter overrides per algorithm (defaults from config.py used otherwise)
-    model_params = {
-        "ppo": {
-            "n_steps": 1024,
-            "batch_size": 256,
-            "n_epochs": 10,
-            "learning_rate": 3e-4,
-            "gamma": 0.995,
-            "gae_lambda": 0.99,
-            "clip_range": 0.2,
-            "ent_coef": 0.02,
-            "vf_coef": 0.5,
-            "max_grad_norm": 0.5,
-            "normalize_advantage": True,
-            "policy_kwargs": {"net_arch": [256, 128], "ortho_init": True},
-        },
-        "ddpg": {
-            "batch_size": 128,
-            "buffer_size": 50000,
-            "learning_rate": 1e-3,
-        },
-        "td3": {
-            "batch_size": 100,
-            "buffer_size": 1000000,
-            "learning_rate": 1e-3,
-        },
-        "sac": {
-            "batch_size": 128,
-            "buffer_size": 100000,
-            "learning_rate": 1e-4,
-            "learning_starts": 100,
-            "ent_coef": "auto_0.1",
-        },
-    }
-
-
-    # Start training loop for each enabled agent
-    enabled = {"a2c": if_using_a2c, 
-               "ddpg": if_using_ddpg, 
-               "ppo": if_using_ppo,
-               "td3": if_using_td3, 
-               "sac": if_using_sac}
+    # Merge built-in defaults with caller overrides (caller wins)
+    merged_params = {k: dict(v) for k, v in BUILTIN_MODEL_PARAMS.items()}
+    if model_params is not None:
+        for name in model_params:
+            if name in merged_params:
+                merged_params[name] = {**merged_params[name], **model_params[name]}
 
     trained = {}
     for name in ["a2c", "ddpg", "ppo", "td3", "sac"]:
-        if not enabled[name]:
+        if name not in models:
             trained[name] = None
             continue
 
         agent = DRLAgent(env=env_train)
-        kwargs = model_params.get(name, None)
+        kwargs = merged_params.get(name)
         model = agent.get_model(name, model_kwargs=kwargs)
 
         tmp_path = f"{RESULTS_DIR}/{name}"

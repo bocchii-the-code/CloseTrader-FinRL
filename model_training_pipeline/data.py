@@ -174,6 +174,6 @@ def main():
     # Save the processed data
     train_df, trade_df = split_and_save_data(processed_full)
 
-# %%
+
 if __name__ == "__main__":
     main()
