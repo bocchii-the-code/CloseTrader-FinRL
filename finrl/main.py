@@ -47,7 +47,6 @@ def check_and_make_directories(directories: list[str]):
         if not os.path.exists(directory):
             os.makedirs(directory)
 
-
 def main() -> int:
     parser = build_parser()
     options = parser.parse_args()

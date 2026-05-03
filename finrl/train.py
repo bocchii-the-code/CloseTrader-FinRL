@@ -1,5 +1,14 @@
 from __future__ import annotations
 
+import pandas as pd
+
+# Suppress Pandas4Warning — yfinance calls pd.Timestamp.utcnow() which is
+# deprecated in pandas >=2.0.  Monkey-patch it to use now('UTC') instead.
+# Regular warnings.filterwarnings() does not catch this C-level deprecation.
+_pd_utcnow = getattr(pd.Timestamp, "utcnow", None)
+if _pd_utcnow is not None:
+    pd.Timestamp.utcnow = lambda: pd.Timestamp.now("UTC")
+
 from finrl.config import ERL_PARAMS
 from finrl.config import INDICATORS
 from finrl.config import RLlib_PARAMS

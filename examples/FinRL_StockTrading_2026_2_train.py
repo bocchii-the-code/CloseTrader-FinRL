@@ -11,8 +11,13 @@ Introduce how to use FinRL to make data into the gym form environment, and train
 from __future__ import annotations
 
 import os
-
 import pandas as pd
+
+# Suppress Pandas4Warning from yfinance/pandas: monkey-patch because
+# regular warnings.filterwarnings() does not catch C-level deprecations.
+_pd_utcnow = getattr(pd.Timestamp, "utcnow", None)
+if _pd_utcnow is not None:
+    pd.Timestamp.utcnow = lambda: pd.Timestamp.now("UTC")
 from stable_baselines3.common.logger import configure
 
 from finrl.agents.stablebaselines3.models import DRLAgent

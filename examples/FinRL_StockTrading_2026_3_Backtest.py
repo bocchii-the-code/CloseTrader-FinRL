@@ -11,6 +11,7 @@ Mean Variance Optimization and DJIA index.
 from __future__ import annotations
 
 import os
+import warnings
 
 import matplotlib
 
@@ -18,6 +19,13 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+
+# Suppress Pandas4Warning from yfinance/pandas: monkey-patch because
+# regular warnings.filterwarnings() does not catch C-level deprecations.
+_pd_utcnow = getattr(pd.Timestamp, "utcnow", None)
+if _pd_utcnow is not None:
+    pd.Timestamp.utcnow = lambda: pd.Timestamp.now("UTC")
+
 from stable_baselines3 import A2C, DDPG, PPO, SAC, TD3
 
 from finrl.agents.stablebaselines3.models import DRLAgent

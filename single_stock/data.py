@@ -14,8 +14,12 @@ import os
 
 import pandas as pd
 import yfinance as yf
-import warnings # Surpress warnings from yfinance
-warnings.filterwarnings("ignore", category=pd.errors.Pandas4Warning)
+
+# Suppress Pandas4Warning from yfinance/pandas: monkey-patch because
+# regular warnings.filterwarnings() does not catch C-level deprecations.
+_pd_utcnow = getattr(pd.Timestamp, "utcnow", None)
+if _pd_utcnow is not None:
+    pd.Timestamp.utcnow = lambda: pd.Timestamp.now("UTC")
 
 from finrl import config_tickers
 from finrl.config import INDICATORS
@@ -58,11 +62,16 @@ def fetch_single_stock_data(ticker: str, start_date: str = None, end_date: str =
     return df_finrl
 
 # %% Part 2. Fetch data - DOW 30 tickers
-def fetch_dow30_data(start_date: str = None, end_date: str = None) -> pd.DataFrame:
+def fetch_dow30_data(ticker_list: list = config_tickers.DOW_30_TICKER, start_date: str = None, end_date: str = None) -> pd.DataFrame:
     """
     Fetch historical stock data for DOW 30 tickers using FinRL's YahooDownloader.
 
     Args:
+        ticker_list (list): The list of ticker symbols. If None, defaults to config_tickers.DOW_30_TICKER. Available tickers are in finrl.config_tickers.DOW_30_TICKER: 
+            ['AAPL', 'AXP', 'BA', 'CAT', 'CSCO', 'CVX', 'DIS', 'DOW', 'GS', 'HD',
+             'IBM', 'INTC', 'JNJ', 'JPM', 'KO', 'MCD', 'MMM', 'MRK', 'MSFT',
+             'NKE', 'PFE', 'PG', 'TRV', 'UNH', 'VZ', 'WBA', 'WMT', 'XOM']
+        
         start_date (str): The start date for fetching data (format: "YYYY-MM-DD"). If None, defaults to TRAIN_START_DATE.
         end_date (str): The end date for fetching data (format: "YYYY-MM-DD"). If None, defaults to TRADE_END_DATE.
 
@@ -70,12 +79,12 @@ def fetch_dow30_data(start_date: str = None, end_date: str = None) -> pd.DataFra
         pd.DataFrame: A DataFrame containing the historical stock data for DOW 30 tickers.
     """
     print("\n=== DOW 30 Tickers ===")
-    print(config_tickers.DOW_30_TICKER)
+    print(ticker_list)
 
     df_raw = YahooDownloader(
         start_date=start_date if start_date else TRAIN_START_DATE,
         end_date=end_date if end_date else TRADE_END_DATE,
-        ticker_list=config_tickers.DOW_30_TICKER,
+        ticker_list=ticker_list
     ).fetch_data()
     print("\n=== Raw data ===")
     print(df_raw.head())
@@ -157,7 +166,7 @@ def split_and_save_data(processed_full: pd.DataFrame, save_path: str=None) -> tu
     #%% Main funtion to run the preprocessing steps
 def main():
     # Fetch data for DOW 30 tickers
-    df_raw = fetch_dow30_data()
+    df_raw = fetch_dow30_data(ticker_list=["AMZN"])
 
     # Preprocess the data
     processed_full = preprocess_data(df_raw)
