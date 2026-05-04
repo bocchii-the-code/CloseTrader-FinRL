@@ -61,6 +61,9 @@ def build_environment(
     train_data_path: str = None,
     tech_indicator_list: list[str] | None = None,
     initial_amount: float = 1_000_000,
+    reward_scaling: float | None = None,
+    turbulence_threshold: float | None = None,
+    **env_overrides,
 ) -> StockTradingEnv:
     """Build the StockTradingEnv environment using the training data.
 
@@ -69,6 +72,11 @@ def build_environment(
             to "train_data.csv" in the parent directory.
         tech_indicator_list: Technical indicators to use. Defaults to config.INDICATORS.
         initial_amount: Starting portfolio cash.
+        reward_scaling: Per-step reward multiplier. None = auto-compute
+            as ``500 / initial_amount`` targeting [-10, 10] range.
+        turbulence_threshold: VIX/turbulence threshold for risk-off mode.
+            None = no turbulence liquidations during training.
+        env_overrides: Overrides for env_kwargs (e.g. reward_scaling).
 
     Returns:
         StockTradingEnv: The initialized training environment.
@@ -87,6 +95,9 @@ def build_environment(
     buy_cost_list = sell_cost_list = [0.001] * stock_dimension
     num_stock_shares = [0] * stock_dimension
 
+    if reward_scaling is None:
+        reward_scaling = 500 / initial_amount
+
     env_kwargs = {
         "hmax": 100,
         "initial_amount": initial_amount,
@@ -97,10 +108,16 @@ def build_environment(
         "stock_dim": stock_dimension,
         "tech_indicator_list": tech_indicator_list,
         "action_space": stock_dimension,
-        "reward_scaling": 1e-4,
+        "reward_scaling": reward_scaling,
+        **env_overrides,
     }
 
-    e_train_gym = StockTradingEnv(df=train, **env_kwargs)
+    e_train_gym = StockTradingEnv(
+        df=train,
+        turbulence_threshold=turbulence_threshold,
+        risk_indicator_col="vix",
+        **env_kwargs,
+    )
     env_train, _ = e_train_gym.get_sb_env()
     print(type(env_train))
     return env_train

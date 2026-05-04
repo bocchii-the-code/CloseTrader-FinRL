@@ -190,6 +190,7 @@ def build_trade_env(
     initial_amount: float = 1_000_000,
     turbulence_threshold: float = 70,
     tech_indicator_list: list[str] | None = None,
+    reward_scaling: float | None = None,
     **env_overrides,
 ) -> StockTradingEnv:
     """Build the trading environment for backtesting.
@@ -199,6 +200,8 @@ def build_trade_env(
         initial_amount: Starting portfolio value.
         turbulence_threshold: VIX threshold for risk-off mode.
         tech_indicator_list: Technical indicators. Defaults to config.INDICATORS.
+        reward_scaling: Per-step reward multiplier. None = auto-compute
+            as ``500 / initial_amount`` targeting [-10, 10] range.
         env_overrides: Overrides for env_kwargs (e.g. reward_scaling).
 
     Returns:
@@ -206,6 +209,8 @@ def build_trade_env(
     """
     if tech_indicator_list is None:
         tech_indicator_list = INDICATORS
+    if reward_scaling is None:
+        reward_scaling = 500 / initial_amount
     stock_dimension = len(trade["tic"].unique())
     state_space = 1 + 2 * stock_dimension + len(tech_indicator_list) * stock_dimension
     print(f"Stock Dimension: {stock_dimension}, State Space: {state_space}")
@@ -223,7 +228,7 @@ def build_trade_env(
         "stock_dim": stock_dimension,
         "tech_indicator_list": tech_indicator_list,
         "action_space": stock_dimension,
-        "reward_scaling": 1e-4,
+        "reward_scaling": reward_scaling,
         **env_overrides,
     }
 
@@ -249,6 +254,7 @@ def test_trained_model(
     turbulence_threshold: float = 70,
     initial_amount: float = 1000000,
     tech_indicator_list: list[str] | None = None,
+    reward_scaling: float | None = None,
 ) -> pd.DataFrame:
     """Run backtest with loaded DRL models and compute baselines.
 
@@ -261,6 +267,8 @@ def test_trained_model(
         turbulence_threshold: VIX threshold for risk-off mode.
         initial_amount: Starting portfolio value.
         tech_indicator_list: Technical indicators (must match training env).
+        reward_scaling: Per-step reward multiplier. None = auto-compute
+            as ``500 / initial_amount`` targeting [-10, 10] range.
 
     Returns:
         DataFrame with one column per strategy, indexed by date.
@@ -269,7 +277,7 @@ def test_trained_model(
 
     # --- Build environment ---
     e_trade_gym = build_trade_env(
-        trade, initial_amount, turbulence_threshold, tech_indicator_list
+        trade, initial_amount, turbulence_threshold, tech_indicator_list, reward_scaling
     )
 
     # --- Run DRL predictions ---
