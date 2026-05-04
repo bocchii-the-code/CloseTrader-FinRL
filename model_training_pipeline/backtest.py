@@ -257,7 +257,7 @@ def test_trained_model(
     print(f"\nComputing baselines for {num_stocks} stock(s) ...")
 
     if num_stocks == 1:
-        drl_results["buy_hold"] = _compute_buy_and_hold(trade, initial_amount)
+        drl_results["mvo"] = _compute_buy_and_hold(trade, initial_amount)
     else:
         from pypfopt.efficient_frontier import EfficientFrontier
 
@@ -275,8 +275,13 @@ def test_trained_model(
         initial_shares = initial_amount * weights * last_prices
         drl_results["mvo"] = trade_prices @ initial_shares
 
+    # Derive date range from the actual trade data (respects CLI args)
+    trade_dates = trade["date"].unique()
+    trade_start = trade_dates[0]
+    trade_end = trade_dates[-1]
+
     drl_results["dji"] = _compute_djia(
-        TRADE_START_DATE, TRADE_END_DATE, initial_amount
+        trade_start, trade_end, initial_amount
     )
 
     # --- Combine results ---

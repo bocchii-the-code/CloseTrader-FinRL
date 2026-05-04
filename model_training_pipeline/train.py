@@ -11,14 +11,17 @@ Introduce how to use FinRL to make data into the gym form environment, and train
 from __future__ import annotations
 
 import os
+
+import matplotlib.pyplot as plt
 import pandas as pd
+from stable_baselines3.common.callbacks import BaseCallback
+from stable_baselines3.common.logger import configure
 
 # Suppress Pandas4Warning from yfinance/pandas: monkey-patch because
 # regular warnings.filterwarnings() does not catch C-level deprecations.
 _pd_utcnow = getattr(pd.Timestamp, "utcnow", None)
 if _pd_utcnow is not None:
     pd.Timestamp.utcnow = lambda: pd.Timestamp.now("UTC")
-from stable_baselines3.common.logger import configure
 
 from finrl.agents.stablebaselines3.models import DRLAgent
 from finrl.config import INDICATORS
@@ -93,13 +96,128 @@ def build_environment(train_data_path: str = None) -> StockTradingEnv:
     print(type(env_train))
     return env_train
 
-# %% Part 3. Train DRL Agents
+# %% Part 3. Live reward plotting callback
+class LiveRewardPlotter(BaseCallback):
+    """Real-time matplotlib plot of per-iteration mean reward during SB3 training.
+
+    Collects step rewards during each rollout, then at ``_on_rollout_end``
+    computes the mean and updates the live plot.  Data points align 1:1 with
+    the per-iteration lines in the training log.
+    """
+
+    # ---- helpers ------------------------------------------------------------
+
+    @staticmethod
+    def _ensure_interactive_backend() -> None:
+        """Switch from Agg to TkAgg if the backend is non-interactive.
+
+        finrl ``backtest`` / ``env_stocktrading`` modules call
+        ``matplotlib.use("Agg")`` before importing pyplot.  When
+        LiveRewardPlotter is instantiated afterwards, the backend is
+        already locked.  ``switch_backend`` is the supported way to flip
+        back after pyplot has been imported.
+        """
+        if plt.get_backend().lower() in ("agg",):
+            try:
+                plt.switch_backend("TkAgg")
+            except Exception:
+                pass  # TkAgg unavailable: stay on Agg, no window
+
+    def _create_figure(self) -> None:
+        """Build the non-blocking matplotlib window and its artists."""
+        if self.interactive:
+            plt.ion()
+        self.fig, self.ax = plt.subplots(figsize=(8, 4))
+        (self.raw_line,) = self.ax.plot([], [], "b-", alpha=0.3, label="iteration reward")
+        (self.avg_line,) = self.ax.plot(
+            [], [], "r-", linewidth=2, label=f"rolling mean ({self.window_size})"
+        )
+        self.ax.set_xlabel("Iteration")
+        self.ax.set_ylabel("Mean Reward")
+        self.ax.set_title(self.title)
+        self.ax.legend(loc="upper left")
+        self.fig.tight_layout()
+        if self.interactive:
+            plt.show(block=False)
+            plt.pause(0.001)  # yield to GUI event loop so window becomes visible
+
+    # ---- init ---------------------------------------------------------------
+
+    def __init__(
+        self,
+        window_size: int = 20,
+        title: str = "Training Reward",
+    ) -> None:
+        super().__init__()
+        self.window_size = window_size
+        self.title = title
+
+        self.iteration_rewards: list[float] = []
+        self._rollout_rewards: list[float] = []
+
+        self._ensure_interactive_backend()
+        self.interactive = plt.get_backend().lower() not in ("agg",)
+        self._create_figure()
+
+    # ---- rollout lifecycle --------------------------------------------------
+
+    def _on_rollout_start(self) -> None:
+        self._rollout_rewards.clear()
+
+    def _on_step(self) -> bool:
+        # Collect step rewards for the current rollout
+        rewards = self.locals.get("rewards", [])
+        if len(rewards):
+            self._rollout_rewards.extend(rewards)
+        return True
+
+    def _on_rollout_end(self) -> None:
+        # Compute mean reward for the just-finished rollout and plot
+        if self._rollout_rewards:
+            avg = sum(self._rollout_rewards) / len(self._rollout_rewards)
+            self.iteration_rewards.append(avg)
+            self._update_plot()
+
+    # ---- plotting -----------------------------------------------------------
+
+    def _update_plot(self) -> None:
+        n = len(self.iteration_rewards)
+        if n == 0:
+            return
+
+        self.raw_line.set_data(range(n), self.iteration_rewards)
+
+        # rolling mean
+        ws = self.window_size
+        rolling_mean = [
+            sum(self.iteration_rewards[max(0, i - ws + 1) : i + 1])
+            / min(ws, i + 1)
+            for i in range(n)
+        ]
+        self.avg_line.set_data(range(n), rolling_mean)
+
+        self.ax.relim()
+        self.ax.autoscale_view()
+        if self.interactive:
+            self.fig.canvas.draw()
+            self.fig.canvas.flush_events()
+            plt.pause(0.001)  # Yield to GUI event loop so window stays responsive
+
+    def _on_training_end(self) -> None:
+        self._update_plot()
+        if self.interactive:
+            plt.ioff()
+            plt.show()
+
+
+# %% Part 4. Train DRL Agents
 def train_drl_agents(
         env_train: StockTradingEnv,
         total_timesteps: int = 30000,
         save_path: str = TRAINED_MODEL_DIR,
         models: list[str] | None = None,
         model_params: dict[str, dict] | None = None,
+        plot_live: bool = False,
         ) -> dict[str, DRLAgent]:
     '''Train DRL agents and save trained models.
 
@@ -109,6 +227,8 @@ def train_drl_agents(
         save_path: Directory for saving model files.
         models: Algorithms to train. Default all five: ["a2c", ..., "sac"].
         model_params: Per-model hyperparameter overrides, merged with BUILTIN_MODEL_PARAMS.
+        plot_live: If True, open a live matplotlib window that plots episode
+            rewards in real time during training.
     Returns:
         Dict mapping algorithm name -> trained model (or None if skipped).
     '''
@@ -140,11 +260,15 @@ def train_drl_agents(
         tmp_path = f"{RESULTS_DIR}/{name}"
         model.set_logger(configure(tmp_path, ["stdout", "csv", "tensorboard"]))
 
+        callbacks = None
+        if plot_live:
+            callbacks = [LiveRewardPlotter(window_size=20, title=f"{name.upper()} Reward")]
+
         trained[name] = agent.train_model(
-            model=model, tb_log_name=name, total_timesteps=total_timesteps
+            model=model, tb_log_name=name, total_timesteps=total_timesteps, callbacks=callbacks
         )
         trained[name].save(os.path.join(save_path, f"agent_{name}"))
-        print(f"  [✓] {name.upper()} trained and saved to {os.path.join(save_path, f'agent_{name}')}")
+        print(f"  [OK] {name.upper()} trained and saved to {os.path.join(save_path, f'agent_{name}')}")
 
     return trained
 
