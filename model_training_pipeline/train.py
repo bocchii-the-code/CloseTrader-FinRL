@@ -57,41 +57,67 @@ def make_trained_model_dir(save_path = TRAINED_MODEL_DIR) -> str:
     return save_path
 
 # %% Part 2. Build environment
-def build_environment(train_data_path: str = None) -> StockTradingEnv:
-# Use absolute path to read train data
-    '''
-    Build the StockTradingEnv environment using the training data.
+def build_environment(
+    train_data_path: str = None,
+    tech_indicator_list: list[str] | None = None,
+    initial_amount: float = 1_000_000,
+    reward_scaling: float | None = None,
+    turbulence_threshold: float | None = None,
+    **env_overrides,
+) -> StockTradingEnv:
+    """Build the StockTradingEnv environment using the training data.
+
     Args:
-        train_data_path (str): The path to the training data CSV file. If None, defaults to "train_data.csv" in the parent directory.
+        train_data_path: Path to the training data CSV file. If None, defaults
+            to "train_data.csv" in the parent directory.
+        tech_indicator_list: Technical indicators to use. Defaults to config.INDICATORS.
+        initial_amount: Starting portfolio cash.
+        reward_scaling: Per-step reward multiplier. None = auto-compute
+            as ``500 / initial_amount`` targeting [-10, 10] range.
+        turbulence_threshold: VIX/turbulence threshold for risk-off mode.
+            None = no turbulence liquidations during training.
+        env_overrides: Overrides for env_kwargs (e.g. reward_scaling).
+
     Returns:
-        StockTradingEnv: The initialized StockTradingEnv environment.
-    '''
+        StockTradingEnv: The initialized training environment.
+    """
+    if tech_indicator_list is None:
+        tech_indicator_list = INDICATORS
     parent_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__))) if train_data_path is None else os.path.dirname(os.path.abspath(train_data_path))
     train = pd.read_csv(os.path.join(parent_path, "train_data.csv"))
     train = train.set_index(train.columns[0])
     train.index.names = [""]
 
     stock_dimension = len(train.tic.unique())
-    state_space = 1 + 2 * stock_dimension + len(INDICATORS) * stock_dimension
+    state_space = 1 + 2 * stock_dimension + len(tech_indicator_list) * stock_dimension
     print(f"Stock Dimension: {stock_dimension}, State Space: {state_space}")
 
     buy_cost_list = sell_cost_list = [0.001] * stock_dimension
     num_stock_shares = [0] * stock_dimension
 
+    if reward_scaling is None:
+        reward_scaling = 500 / initial_amount
+
     env_kwargs = {
         "hmax": 100,
-        "initial_amount": 1000000,
+        "initial_amount": initial_amount,
         "num_stock_shares": num_stock_shares,
         "buy_cost_pct": buy_cost_list,
         "sell_cost_pct": sell_cost_list,
         "state_space": state_space,
         "stock_dim": stock_dimension,
-        "tech_indicator_list": INDICATORS,
+        "tech_indicator_list": tech_indicator_list,
         "action_space": stock_dimension,
-        "reward_scaling": 1e-4,
+        "reward_scaling": reward_scaling,
+        **env_overrides,
     }
 
-    e_train_gym = StockTradingEnv(df=train, **env_kwargs)
+    e_train_gym = StockTradingEnv(
+        df=train,
+        turbulence_threshold=turbulence_threshold,
+        risk_indicator_col="vix",
+        **env_kwargs,
+    )
     env_train, _ = e_train_gym.get_sb_env()
     print(type(env_train))
     return env_train

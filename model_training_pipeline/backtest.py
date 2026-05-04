@@ -5,7 +5,7 @@ This series is a reproduction of paper "Deep reinforcement learning for
 automated stock trading: An ensemble strategy".
 
 Introducing how to use the agents we trained to do backtest, and compare with
-baselines such as buy-and-hold and DJIA index.
+baselines such as buy-and-hold, DJIA, and S&P 500 indices.
 """
 #%%
 from __future__ import annotations
@@ -164,22 +164,55 @@ def _compute_djia(
     return dji["close"].div(fst_close).mul(initial_amount)
 
 
+def _compute_sp500(
+    start_date: str = TRADE_START_DATE,
+    end_date: str = TRADE_END_DATE,
+    initial_amount: float = 1_000_000,
+) -> pd.Series:
+    """Download S&P 500 index and normalize to start at initial_amount."""
+    df_sp500 = yf.download("^GSPC", start=start_date, end=end_date)
+    if df_sp500.empty:
+        raise RuntimeError("Failed to download S&P 500 data")
+    sp500 = df_sp500[["Close"]].reset_index()
+    sp500.columns = ["date", "close"]
+    sp500["date"] = sp500["date"].dt.strftime("%Y-%m-%d")
+    fst_close = sp500["close"].iloc[0]
+    sp500 = sp500.set_index("date")
+    return sp500["close"].div(fst_close).mul(initial_amount)
+
+
 # =============================================================================
 # Part 4. Build Environment
 # =============================================================================
 
-def build_trade_env(trade: pd.DataFrame, **env_overrides) -> StockTradingEnv:
+def build_trade_env(
+    trade: pd.DataFrame,
+    initial_amount: float = 1_000_000,
+    turbulence_threshold: float = 70,
+    tech_indicator_list: list[str] | None = None,
+    reward_scaling: float | None = None,
+    **env_overrides,
+) -> StockTradingEnv:
     """Build the trading environment for backtesting.
 
     Args:
         trade: Trading data DataFrame.
+        initial_amount: Starting portfolio value.
+        turbulence_threshold: VIX threshold for risk-off mode.
+        tech_indicator_list: Technical indicators. Defaults to config.INDICATORS.
+        reward_scaling: Per-step reward multiplier. None = auto-compute
+            as ``500 / initial_amount`` targeting [-10, 10] range.
         env_overrides: Overrides for env_kwargs (e.g. reward_scaling).
 
     Returns:
         Initialized StockTradingEnv in test mode.
     """
+    if tech_indicator_list is None:
+        tech_indicator_list = INDICATORS
+    if reward_scaling is None:
+        reward_scaling = 500 / initial_amount
     stock_dimension = len(trade["tic"].unique())
-    state_space = 1 + 2 * stock_dimension + len(INDICATORS) * stock_dimension
+    state_space = 1 + 2 * stock_dimension + len(tech_indicator_list) * stock_dimension
     print(f"Stock Dimension: {stock_dimension}, State Space: {state_space}")
 
     buy_cost_list = sell_cost_list = [0.001] * stock_dimension
@@ -187,20 +220,23 @@ def build_trade_env(trade: pd.DataFrame, **env_overrides) -> StockTradingEnv:
 
     env_kwargs = {
         "hmax": 100,
-        "initial_amount": 1_000_000,
+        "initial_amount": initial_amount,
         "num_stock_shares": num_stock_shares,
         "buy_cost_pct": buy_cost_list,
         "sell_cost_pct": sell_cost_list,
         "state_space": state_space,
         "stock_dim": stock_dimension,
-        "tech_indicator_list": INDICATORS,
+        "tech_indicator_list": tech_indicator_list,
         "action_space": stock_dimension,
-        "reward_scaling": 1e-4,
+        "reward_scaling": reward_scaling,
         **env_overrides,
     }
 
     return StockTradingEnv(
-        df=trade, turbulence_threshold=70, risk_indicator_col="vix", **env_kwargs
+        df=trade,
+        turbulence_threshold=turbulence_threshold,
+        risk_indicator_col="vix",
+        **env_kwargs,
     )
 
 
@@ -217,6 +253,8 @@ def test_trained_model(
     plot_filename: str = "backtest_result.png",
     turbulence_threshold: float = 70,
     initial_amount: float = 1000000,
+    tech_indicator_list: list[str] | None = None,
+    reward_scaling: float | None = None,
 ) -> pd.DataFrame:
     """Run backtest with loaded DRL models and compute baselines.
 
@@ -228,6 +266,9 @@ def test_trained_model(
         plot_filename: Name of the output plot file (relative to output_dir).
         turbulence_threshold: VIX threshold for risk-off mode.
         initial_amount: Starting portfolio value.
+        tech_indicator_list: Technical indicators (must match training env).
+        reward_scaling: Per-step reward multiplier. None = auto-compute
+            as ``500 / initial_amount`` targeting [-10, 10] range.
 
     Returns:
         DataFrame with one column per strategy, indexed by date.
@@ -235,7 +276,9 @@ def test_trained_model(
     os.makedirs(output_dir, exist_ok=True)
 
     # --- Build environment ---
-    e_trade_gym = build_trade_env(trade)
+    e_trade_gym = build_trade_env(
+        trade, initial_amount, turbulence_threshold, tech_indicator_list, reward_scaling
+    )
 
     # --- Run DRL predictions ---
     drl_results: dict[str, pd.Series] = {}
@@ -281,6 +324,9 @@ def test_trained_model(
     trade_end = trade_dates[-1]
 
     drl_results["dji"] = _compute_djia(
+        trade_start, trade_end, initial_amount
+    )
+    drl_results["sp500"] = _compute_sp500(
         trade_start, trade_end, initial_amount
     )
 

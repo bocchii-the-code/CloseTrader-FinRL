@@ -73,10 +73,11 @@ def run_pipeline(
     use_turbulence: bool = True,
     # Train
     models: list[str] | None = None,
-    total_timesteps: int = 100_000,
+    total_timesteps: int = 100000,
     model_params: dict[str, dict] | None = None,
     trained_model_dir: str = TRAINED_MODEL_DIR,
     plot_live: bool = True,
+    reward_scaling: float | None = None,
     # Backtest
     initial_amount: float = 1000000,
     turbulence_threshold: float = 70,
@@ -92,10 +93,12 @@ def run_pipeline(
     ticker_list: Stock tickers, e.g. ["AAPL"] or ["AAPL", "MSFT"].
     indicator_list: Technical indicators (default: config.INDICATORS).
     models: DRL algorithms to train (default: ["ppo"]).
-        Valid: ["a2c", "ddpg", "ppo", "td3", "sac"].
+        Valid: [a2c ddpg ppo td3 sac].
     model_params: Per-model hyperparameter overrides.
         Merged with BUILTIN_MODEL_PARAMS. Example:
         {"ppo": {"n_steps": 2048, "learning_rate": 2.5e-4}}.
+    reward_scaling: Multiplier for per-step rewards. None = auto-compute
+        as ``500 / initial_amount`` to keep scaled rewards roughly in [-10, 10].
     skip_data: Reuse existing CSV files instead of downloading.
     skip_train: Only backtest (models must already exist).
 
@@ -104,10 +107,19 @@ def run_pipeline(
     pd.DataFrame
         One column per strategy, indexed by trade date.
     """
+    if ticker_list == ["All"]:
+        ticker_list = [
+            "AAPL", "AXP", "BA", "CAT", "CSCO", "CVX", "DIS", "DOW", "GS",
+            "HD", "IBM", "INTC", "JNJ", "JPM", "KO", "MCD", "MMM", "MRK",
+            "MSFT", "NKE", "PFE", "PG", "TRV", "UNH", "VZ", "WBA", "WMT",
+            "XOM",
+        ]
     if models is None:
         models = ["ppo"]
     if indicator_list is None:
         indicator_list = INDICATORS
+    if reward_scaling is None:
+        reward_scaling = 100 / initial_amount
 
     # Merge user hyperparam overrides with defaults
     merged_params: dict[str, dict] = {
@@ -155,7 +167,12 @@ def run_pipeline(
 
         make_trained_model_dir(trained_model_dir)
 
-        env_train = build_environment()
+        env_train = build_environment(
+            tech_indicator_list=indicator_list,
+            initial_amount=initial_amount,
+            reward_scaling=reward_scaling,
+            turbulence_threshold=turbulence_threshold,
+        )
 
         trained_models = train_drl_agents(
             env_train,
@@ -183,6 +200,8 @@ def run_pipeline(
         plot_filename=plot_filename,
         turbulence_threshold=turbulence_threshold,
         initial_amount=initial_amount,
+        tech_indicator_list=indicator_list,
+        reward_scaling=reward_scaling,
     )
 
     return results
@@ -198,7 +217,13 @@ def _parse_args() -> argparse.Namespace:
     )
     p.add_argument(
         "--ticker", nargs="+", default=["AAPL"],
-        help="Stock ticker(s), e.g. AAPL or AAPL MSFT",
+        help=(
+            '''
+            Stock ticker(s) available: [AAPL AXP BA CAT CSCO CVX DIS DOW GS HD IBM INTC JNJ JPM KO MCD MMM MRK MSFT NKE PFE PG TRV UNH VZ WBA WMT XOM]
+            or 
+            "All" for all DOW 30 tickers.
+            '''
+        ),
     )
     p.add_argument(
         "--models", nargs="+", default=["ppo"],
@@ -234,18 +259,21 @@ def _parse_args() -> argparse.Namespace:
 if __name__ == "__main__":
     model_params = {    
         "ppo": {
-        "n_steps": 512, 
+        "n_steps": 1024, 
         "batch_size": 256, 
         "n_epochs": 10,
-        "learning_rate": 0.001, 
-        "gamma": 0.995, 
-        "gae_lambda": 0.99,
+        "learning_rate": 0.00025, 
+        "gamma": 0.95, 
+        "gae_lambda": 0.98,
         "clip_range": 0.2, 
-        "ent_coef": 0.02, 
+        "ent_coef": 0.1, 
         "vf_coef": 0.5,
         "max_grad_norm": 0.5, 
         "normalize_advantage": True,
-        "policy_kwargs": {"net_arch": [256, 256], "ortho_init": True},
+        "policy_kwargs": {
+            "net_arch": [256, 128], 
+            # "ortho_init": True
+            },
     },}
     args = _parse_args()
     run_pipeline(
