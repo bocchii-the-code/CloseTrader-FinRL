@@ -73,7 +73,7 @@ def run_pipeline(
     use_turbulence: bool = True,
     # Train
     models: list[str] | None = None,
-    total_timesteps: int = 100_000,
+    total_timesteps: int = 100000,
     model_params: dict[str, dict] | None = None,
     trained_model_dir: str = TRAINED_MODEL_DIR,
     plot_live: bool = True,
@@ -155,7 +155,10 @@ def run_pipeline(
 
         make_trained_model_dir(trained_model_dir)
 
-        env_train = build_environment()
+        env_train = build_environment(
+            tech_indicator_list=indicator_list,
+            initial_amount=initial_amount,
+        )
 
         trained_models = train_drl_agents(
             env_train,
@@ -183,6 +186,7 @@ def run_pipeline(
         plot_filename=plot_filename,
         turbulence_threshold=turbulence_threshold,
         initial_amount=initial_amount,
+        tech_indicator_list=indicator_list,
     )
 
     return results
@@ -234,14 +238,14 @@ def _parse_args() -> argparse.Namespace:
 if __name__ == "__main__":
     model_params = {    
         "ppo": {
-        "n_steps": 512, 
+        "n_steps": 1024, 
         "batch_size": 256, 
         "n_epochs": 10,
         "learning_rate": 0.001, 
-        "gamma": 0.995, 
-        "gae_lambda": 0.99,
+        "gamma": 0.95, 
+        "gae_lambda": 0.98,
         "clip_range": 0.2, 
-        "ent_coef": 0.02, 
+        "ent_coef": 0.01, 
         "vf_coef": 0.5,
         "max_grad_norm": 0.5, 
         "normalize_advantage": True,
