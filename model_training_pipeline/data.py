@@ -140,21 +140,22 @@ def preprocess_data(df_raw: pd.DataFrame,
     return processed_full
 
 
-    # %% Part 4. Split and save data
-def split_and_save_data(processed_full: pd.DataFrame, save_path: str=None) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """Split the processed data into training and trading sets, and save them as CSV files. The training set will be used for training the DRL agents, while the trading set will be used for backtesting.
-    Args:
-        processed_full (pd.DataFrame): The fully processed DataFrame containing all the stock data.
-        save_path (str): The directory path where the CSV files will be saved. If None, defaults to the parent directory of the current file. 
-    Returns:
-        train, trade: A tuple containing the (training, trading) DataFrames.
-
+# %% Part 4. Split and save data
+def split_and_save_data(
+    processed_full: pd.DataFrame,
+    save_path: str = None,
+    *,
+    train_start: str = TRAIN_START_DATE,
+    train_end: str = TRAIN_END_DATE,
+    trade_start: str = TRADE_START_DATE,
+    trade_end: str = TRADE_END_DATE,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Split processed data into train/trade sets and save as CSV.
     """
-
     parent_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__))) if save_path is None else save_path
 
-    train = data_split(processed_full, TRAIN_START_DATE, TRAIN_END_DATE)
-    trade = data_split(processed_full, TRADE_START_DATE, TRADE_END_DATE)
+    train = data_split(processed_full, train_start, train_end)
+    trade = data_split(processed_full, trade_start, trade_end)
     print(f"\nTrain data length: {len(train)}")
     print(f"Trade data length: {len(trade)}")
 
@@ -163,7 +164,8 @@ def split_and_save_data(processed_full: pd.DataFrame, save_path: str=None) -> tu
     print("Data saved to train_data.csv and trade_data.csv")
     return train, trade
 
-    #%% Main funtion to run the preprocessing steps
+
+#%% Main function to run the preprocessing steps
 def main():
     # Fetch data for DOW 30 tickers
     df_raw = fetch_dow30_data(ticker_list=["AMZN"])

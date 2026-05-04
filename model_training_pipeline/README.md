@@ -65,6 +65,7 @@ ModelPipeline.run_pipeline()
 | `--plot` | `backtest_result.png` | Plot filename |
 | `--skip-data` | `false` | Reuse existing CSV files |
 | `--skip-train` | `false` | Skip training, only backtest |
+| `--plot-live` | `false` | Show live matplotlib window with episode rewards during training |
 
 ---
 
@@ -83,6 +84,44 @@ results = run_pipeline(
     skip_data=True,    # reuse existing CSVs
 )
 ```
+
+---
+
+## Live Reward Plotting
+
+Enable a real-time matplotlib window that tracks episode rewards during training:
+
+### Via the unified pipeline (CLI)
+
+```bash
+uv run python model_training_pipeline/ModelPipeline.py --ticker AAPL --models ppo --plot-live
+```
+
+### Via the unified pipeline (API)
+
+```python
+from model_training_pipeline.ModelPipeline import run_pipeline
+
+results = run_pipeline(
+    ticker_list=["AAPL"],
+    models=["ppo"],
+    plot_live=True,
+)
+```
+
+### Via the training stage directly
+
+```python
+from model_training_pipeline.train import build_environment, train_drl_agents
+
+env = build_environment()
+train_drl_agents(env, total_timesteps=100_000, models=["ppo"], plot_live=True)
+```
+
+- **Blue line** = raw episode reward  
+- **Red line** = rolling mean (window = 20 episodes)
+
+If no interactive display is available (e.g. remote server with `Agg` backend), the callback still collects rewards silently and skips the GUI redraw.
 
 ---
 

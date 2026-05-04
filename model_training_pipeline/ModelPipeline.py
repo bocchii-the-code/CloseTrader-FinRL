@@ -76,6 +76,7 @@ def run_pipeline(
     total_timesteps: int = 100_000,
     model_params: dict[str, dict] | None = None,
     trained_model_dir: str = TRAINED_MODEL_DIR,
+    plot_live: bool = True,
     # Backtest
     initial_amount: float = 1000000,
     turbulence_threshold: float = 70,
@@ -117,8 +118,6 @@ def run_pipeline(
             if name in merged_params:
                 merged_params[name] = {**merged_params[name], **model_params[name]}
 
-    repo_root = _repo_root
-
     # ====== Stage 1: Data ================================================
     if not skip_data:
         _banner("STAGE 1: Data", f"Downloading {ticker_list}")
@@ -138,7 +137,14 @@ def run_pipeline(
             use_turbulence=use_turbulence,
         )
 
-        train_df, trade_df = split_and_save_data(processed_full, save_path=repo_root)
+        train_df, trade_df = split_and_save_data(
+            processed_full,
+            save_path=_repo_root,
+            train_start=train_start,
+            train_end=train_end,
+            trade_start=trade_start,
+            trade_end=trade_end,
+        )
     else:
         print("Skipping data stage -- using existing CSV files")
         train_df, trade_df = _load_data()
@@ -157,6 +163,7 @@ def run_pipeline(
             save_path=trained_model_dir,
             models=models,
             model_params=merged_params,
+            plot_live=plot_live,
         )
     else:
         print("\nSkipping training stage -- loading existing models")
@@ -199,7 +206,7 @@ def _parse_args() -> argparse.Namespace:
         help="DRL algorithm(s) to train",
     )
     p.add_argument(
-        "--total-timesteps", type=int, default=100000,
+        "--total-timesteps", type=int, default=20000,
         help="Training steps per agent",
     )
     p.add_argument("--train-start", default=TRAIN_START_DATE)
@@ -217,12 +224,32 @@ def _parse_args() -> argparse.Namespace:
         "--skip-train", action="store_true",
         help="Only backtest (models must already exist)",
     )
+    p.add_argument(
+        "--plot-live", action="store_true",
+        help="Open a live matplotlib window tracking reward per episode during training",
+    )
     return p.parse_args()
 
 
 if __name__ == "__main__":
+    model_params = {    
+        "ppo": {
+        "n_steps": 512, 
+        "batch_size": 256, 
+        "n_epochs": 10,
+        "learning_rate": 0.001, 
+        "gamma": 0.995, 
+        "gae_lambda": 0.99,
+        "clip_range": 0.2, 
+        "ent_coef": 0.02, 
+        "vf_coef": 0.5,
+        "max_grad_norm": 0.5, 
+        "normalize_advantage": True,
+        "policy_kwargs": {"net_arch": [256, 256], "ortho_init": True},
+    },}
     args = _parse_args()
     run_pipeline(
+        model_params= model_params,
         ticker_list=args.ticker,
         models=args.models,
         total_timesteps=args.total_timesteps,
@@ -235,4 +262,5 @@ if __name__ == "__main__":
         plot_filename=args.plot,
         skip_data=args.skip_data,
         skip_train=args.skip_train,
+        plot_live=args.plot_live,
     )
