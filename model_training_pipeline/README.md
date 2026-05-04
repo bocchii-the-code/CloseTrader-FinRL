@@ -65,7 +65,7 @@ ModelPipeline.run_pipeline()
 | `--plot` | `backtest_result.png` | Plot filename |
 | `--skip-data` | `false` | Reuse existing CSV files |
 | `--skip-train` | `false` | Skip training, only backtest |
-| `--plot-live` | `false` | Show live matplotlib window with episode rewards during training |
+| `--plot-live` | `false` | Show live matplotlib window with per-iteration mean rewards during training |
 
 ---
 
@@ -89,7 +89,7 @@ results = run_pipeline(
 
 ## Live Reward Plotting
 
-Enable a real-time matplotlib window that tracks episode rewards during training:
+Enable a real-time matplotlib window that tracks per-iteration mean reward during training:
 
 ### Via the unified pipeline (CLI)
 
@@ -118,8 +118,8 @@ env = build_environment()
 train_drl_agents(env, total_timesteps=100_000, models=["ppo"], plot_live=True)
 ```
 
-- **Blue line** = raw episode reward  
-- **Red line** = rolling mean (window = 20 episodes)
+- **Blue line** = iteration reward (mean per-step reward across the rollout)  
+- **Red line** = rolling mean (window = 20 iterations)
 
 If no interactive display is available (e.g. remote server with `Agg` backend), the callback still collects rewards silently and skips the GUI redraw.
 
