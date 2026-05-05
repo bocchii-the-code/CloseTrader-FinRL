@@ -44,9 +44,14 @@ from model_training_pipeline.train import build_environment
 from model_training_pipeline.train import make_trained_model_dir
 from model_training_pipeline.train import train_drl_agents
 
-from finrl.config import INDICATORS, TRAINED_MODEL_DIR
-from finrl.config import TRAIN_END_DATE, TRAIN_START_DATE
-from finrl.config import TRADE_END_DATE, TRADE_START_DATE
+from finrl.config import (
+    INDICATORS,
+    TRADE_END_DATE,
+    TRADE_START_DATE,
+    TRAIN_END_DATE,
+    TRAIN_START_DATE,
+    TRAINED_MODEL_DIR,
+)
 
 
 # =============================================================================
@@ -216,13 +221,13 @@ def _parse_args() -> argparse.Namespace:
         description="ModelPipeline -- RL pipeline for stock trading"
     )
     p.add_argument(
-        "--ticker", nargs="+", default=["AAPL"],
+        "--ticker",
+        nargs="+",
+        default=["AAPL"],
         help=(
-            '''
-            Stock ticker(s) available: [AAPL AXP BA CAT CSCO CVX DIS DOW GS HD IBM INTC JNJ JPM KO MCD MMM MRK MSFT NKE PFE PG TRV UNH VZ WBA WMT XOM]
-            or 
-            "All" for all DOW 30 tickers.
-            '''
+            "Stock ticker(s): AAPL AXP BA CAT CSCO CVX DIS DOW GS HD IBM"
+            " INTC JNJ JPM KO MCD MMM MRK MSFT NKE PFE PG TRV UNH VZ"
+            " WBA WMT XOM, or 'All' for all DOW 30 tickers."
         ),
     )
     p.add_argument(
@@ -257,27 +262,25 @@ def _parse_args() -> argparse.Namespace:
 
 
 if __name__ == "__main__":
-    model_params = {    
+    model_params = {
         "ppo": {
-        "n_steps": 1024, 
-        "batch_size": 256, 
-        "n_epochs": 10,
-        "learning_rate": 0.00025, 
-        "gamma": 0.95, 
-        "gae_lambda": 0.98,
-        "clip_range": 0.2, 
-        "ent_coef": 0.1, 
-        "vf_coef": 0.5,
-        "max_grad_norm": 0.5, 
-        "normalize_advantage": True,
-        "policy_kwargs": {
-            "net_arch": [256, 128], 
-            # "ortho_init": True
-            },
-    },}
+            "n_steps": 1024,
+            "batch_size": 256,
+            "n_epochs": 10,
+            "learning_rate": 0.00025,
+            "gamma": 0.95,
+            "gae_lambda": 0.98,
+            "clip_range": 0.2,
+            "ent_coef": 0.1,
+            "vf_coef": 0.5,
+            "max_grad_norm": 0.5,
+            "normalize_advantage": True,
+            "policy_kwargs": {"net_arch": [256, 128]},
+        },
+    }
     args = _parse_args()
     run_pipeline(
-        model_params= model_params,
+        model_params=model_params,
         ticker_list=args.ticker,
         models=args.models,
         total_timesteps=args.total_timesteps,
